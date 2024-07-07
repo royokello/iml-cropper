@@ -20,6 +20,8 @@
             margin-top: 20px;
         }
     </style>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
 </head>
 <body>
     <div class="image-container">
@@ -38,19 +40,36 @@
         let imageFiles = {{ image_files|tojson }};
         let cropper;
 
-        function updateImage() {
-            if (cropper) {
-                cropper.destroy();
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCroppieImage(); // Initialize the cropper with the first image on load
+        });
+
+        function updateCroppieImage() {
+            const croppieElement = document.getElementById('croppie');
+            if (croppieElement) {
+                // Check if cropper is already initialized
+                if (window.cropper) {
+                    window.cropper.destroy(); // Destroy the existing Croppie instance
+                }
+                // Initialize a new Croppie instance
+                window.cropper = new Croppie(croppieElement, {
+                    viewport: { width: 200, height: 200, type: 'square' },
+                    boundary: { width: 300, height: 300 },
+                    showZoomer: true,
+                    enableOrientation: true
+                });
+
+                // Bind the new image to the Croppie instance
+                window.cropper.bind({
+                    url: '/image/' + imageFiles[currentIndex], // Ensure this path dynamically changes as needed
+                }).then(function() {
+                    console.log('Croppie bound to new image.');
+                }).catch(function(error) {
+                    console.error('Error binding Croppie:', error);
+                });
+            } else {
+                console.error('Croppie element not found!');
             }
-            cropper = new Croppie(document.getElementById('croppie'), {
-                viewport: { width: 200, height: 200, type: 'square' },
-                boundary: { width: 300, height: 300 },
-                showZoomer: true,
-                enableOrientation: true
-            });
-            cropper.bind({
-                url: '/image/' + imageFiles[currentIndex],
-            });
         }
 
         function cropImage() {
@@ -61,17 +80,13 @@
                 saveLabel(coords);
             });
         }
-        
-        function updateImage() {
-            document.getElementById('image').src = '/image/' + imageFiles[currentIndex];
-        }
 
         function nextImage() {
             fetch('/next_image', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     currentIndex = data.index;
-                    updateImage();
+                    updateCroppieImage();
                 });
         }
 
@@ -80,7 +95,7 @@
                 .then(response => response.json())
                 .then(data => {
                     currentIndex = data.index;
-                    updateImage();
+                    updateCroppieImage();
                 });
         }
 
@@ -89,7 +104,7 @@
                 .then(response => response.json())
                 .then(data => {
                     currentIndex = data.index;
-                    updateImage();
+                    updateCroppieImage();
                 });
         }
 
@@ -98,7 +113,7 @@
                 .then(response => response.json())
                 .then(data => {
                     currentIndex = data.index;
-                    updateImage();
+                    updateCroppieImage();
                 });
         }
 
