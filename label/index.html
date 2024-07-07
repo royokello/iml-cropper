@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Labeling Tool</title>
+    <style>
+        .image-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .image {
+            max-width: 80%;
+            max-height: 80vh;
+            border: 1px solid #ccc;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="image-container">
+        <img id="image" src="/image/{{ image_files[current_index] }}" alt="Image" class="image">
+        <div class="controls">
+            <button onclick="prevImage()">Previous</button>
+            <button onclick="nextImage()">Next</button>
+            <input type="text" id="labelInput" placeholder="Enter label">
+            <button onclick="saveLabel()">Save Label</button>
+        </div>
+    </div>
+
+    <script>
+        let currentIndex = {{ current_index }};
+        let imageFiles = {{ image_files|tojson }};
+        
+        function updateImage() {
+            document.getElementById('image').src = '/image/' + imageFiles[currentIndex];
+        }
+
+        function nextImage() {
+            fetch('/next_image', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    currentIndex = data.index;
+                    updateImage();
+                });
+        }
+
+        function prevImage() {
+            fetch('/prev_image', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    currentIndex = data.index;
+                    updateImage();
+                });
+        }
+
+        function saveLabel() {
+            const label = document.getElementById('labelInput').value;
+            const filename = imageFiles[currentIndex];
+            fetch('/label', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, label })
+            }).then(response => response.json())
+              .then(data => {
+                  if (data.success) {
+                      alert('Label saved!');
+                      document.getElementById('labelInput').value = '';
+                  }
+              });
+        }
+    </script>
+</body>
+</html>
