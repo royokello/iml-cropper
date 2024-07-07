@@ -23,18 +23,44 @@
 </head>
 <body>
     <div class="image-container">
-        <img id="image" src="/image/{{ image_files[current_index] }}" alt="Image" class="image">
+        <div id="croppie"></div>
         <div class="controls">
             <button onclick="prevImage()">Previous</button>
             <button onclick="nextImage()">Next</button>
-            <input type="text" id="labelInput" placeholder="Enter label">
-            <button onclick="saveLabel()">Save Label</button>
+            <button onclick="prevLabeledImage()">Previous Labeled</button>
+            <button onclick="nextLabeledImage()">Next Labeled</button>
+            <button onclick="cropImage()">Crop Image</button>
         </div>
     </div>
 
     <script>
         let currentIndex = {{ current_index }};
         let imageFiles = {{ image_files|tojson }};
+        let cropper;
+
+        function updateImage() {
+            if (cropper) {
+                cropper.destroy();
+            }
+            cropper = new Croppie(document.getElementById('croppie'), {
+                viewport: { width: 200, height: 200, type: 'square' },
+                boundary: { width: 300, height: 300 },
+                showZoomer: true,
+                enableOrientation: true
+            });
+            cropper.bind({
+                url: '/image/' + imageFiles[currentIndex],
+            });
+        }
+
+        function cropImage() {
+            cropper.result({
+                type: 'canvas',
+                size: 'viewport'
+            }).then(function(coords) {
+                saveLabel(coords);
+            });
+        }
         
         function updateImage() {
             document.getElementById('image').src = '/image/' + imageFiles[currentIndex];
@@ -58,18 +84,34 @@
                 });
         }
 
-        function saveLabel() {
-            const label = document.getElementById('labelInput').value;
+        function nextLabeledImage() {
+            fetch('/next_labeled_image', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    currentIndex = data.index;
+                    updateImage();
+                });
+        }
+
+        function prevLabeledImage() {
+            fetch('/prev_labeled_image', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    currentIndex = data.index;
+                    updateImage();
+                });
+        }
+
+        function saveLabel(coords) {
             const filename = imageFiles[currentIndex];
             fetch('/label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, label })
+                body: JSON.stringify({ filename, ...coords })
             }).then(response => response.json())
               .then(data => {
                   if (data.success) {
                       alert('Label saved!');
-                      document.getElementById('labelInput').value = '';
                   }
               });
         }
