@@ -5,131 +5,162 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Labeling Tool</title>
     <style>
-        .image-container {
+        body {
             display: flex;
-            justify-content: center;
-            align-items: center;
             flex-direction: column;
-        }
-        .image {
-            max-width: 80%;
-            max-height: 80vh;
-            border: 1px solid #ccc;
+            align-items: center;
+            font-family: Arial, sans-serif;
         }
         .controls {
             margin-top: 20px;
         }
+        #image-container {
+            position: relative;
+            margin-top: 20px;
+        }
+
+        #image {
+            max-width: 512px;
+            max-height: 512px;
+        }
+        #crop-square {
+            position: absolute;
+            border: 2px dashed #ff0000;
+            cursor: move;
+            width: 100px; /* Initial size */
+            height: 100px;
+        }
     </style>
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
 </head>
 <body>
-    <div class="image-container">
-        <div id="croppie"></div>
-        <div class="controls">
-            <button onclick="prevImage()">Previous</button>
-            <button onclick="nextImage()">Next</button>
-            <button onclick="prevLabeledImage()">Previous Labeled</button>
-            <button onclick="nextLabeledImage()">Next Labeled</button>
-            <button onclick="cropImage()">Crop Image</button>
-        </div>
+    <div id="image-info">
+        <span id="current-index">1</span> / <span id="total-images">{{ total_images }}</span>
+    </div>
+
+    <div class="controls">
+        <button onclick="prevImage()">Previous</button>
+        <button onclick="nextImage()">Next</button>
+        <button onclick="prevLabeledImage()">Previous Labeled</button>
+        <button onclick="nextLabeledImage()">Next Labeled</button>
+        <button onclick="saveLabel()">Save Label</button>
+    </div>
+
+    <div id="image-container">
+        <img id="image" src="" alt="Image to be labeled">
+        <div id="crop-square"></div>
+    </div>
+
+    <div class="controls">
+        <label for="crop-size">Crop Square Size: </label>
+        <input type="range" id="crop-size" min="50" max="500" value="100" oninput="resizeCropSquare()">
     </div>
 
     <script>
-        let currentIndex = {{ current_index }};
-        let imageFiles = {{ image_files|tojson }};
-        let cropper;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            updateCroppieImage(); // Initialize the cropper with the first image on load
+        let cropData = { x: 0, y: 0, delta: 100 };
+        const cropSquare = document.getElementById('crop-square');
+        let isDragging = false;
+        let startX, startY;
+
+        cropSquare.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - cropSquare.offsetLeft;
+            startY = e.clientY - cropSquare.offsetTop;
         });
 
-        function updateCroppieImage() {
-            const croppieElement = document.getElementById('croppie');
-            if (croppieElement) {
-                // Check if cropper is already initialized
-                if (window.cropper) {
-                    window.cropper.destroy(); // Destroy the existing Croppie instance
-                }
-                // Initialize a new Croppie instance
-                window.cropper = new Croppie(croppieElement, {
-                    viewport: { width: 200, height: 200, type: 'square' },
-                    boundary: { width: 300, height: 300 },
-                    showZoomer: true,
-                    enableOrientation: true
-                });
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                let x = e.clientX - startX;
+                let y = e.clientY - startY;
 
-                // Bind the new image to the Croppie instance
-                window.cropper.bind({
-                    url: '/image/' + imageFiles[currentIndex], // Ensure this path dynamically changes as needed
-                }).then(function() {
-                    console.log('Croppie bound to new image.');
-                }).catch(function(error) {
-                    console.error('Error binding Croppie:', error);
-                });
-            } else {
-                console.error('Croppie element not found!');
+                // Ensure the crop square stays within the image container
+                const containerRect = document.getElementById('image-container').getBoundingClientRect();
+                const squareRect = cropSquare.getBoundingClientRect();
+
+                if (x < 0) x = 0;
+                if (y < 0) y = 0;
+                if (x + squareRect.width > containerRect.width) x = containerRect.width - squareRect.width;
+                if (y + squareRect.height > containerRect.height) y = containerRect.height - squareRect.height;
+
+                cropSquare.style.left = x + 'px';
+                cropSquare.style.top = y + 'px';
             }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        function resizeCropSquare() {
+            const size = document.getElementById('crop-size').value;
+            const cropSquare = document.getElementById('crop-square');
+            cropSquare.style.width = size + 'px';
+            cropSquare.style.height = size + 'px';
+            cropData.delta = size;
         }
 
-        function cropImage() {
-            cropper.result({
-                type: 'canvas',
-                size: 'viewport'
-            }).then(function(coords) {
-                saveLabel(coords);
-            });
+        window.onload = function() {
+            fetchImageByIndex(1);
+        };
+
+        function fetchImageByIndex(index) {
+            const imageUrl = `/image/${index}`;
+            document.getElementById('image').src = imageUrl;
+        }
+
+        function fetchImage(url) {
+            fetch(url, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {document.getElementById('image').src = data.filepath;})
+                .catch(error => {
+                    console.error('Error fetching image:', error);
+                });
+        }
+
+        function currentImage() {
+            fetchImage('/current_image');
         }
 
         function nextImage() {
-            fetch('/next_image', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    currentIndex = data.index;
-                    updateCroppieImage();
-                });
+            fetchImage('/next_image');
         }
 
         function prevImage() {
-            fetch('/prev_image', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    currentIndex = data.index;
-                    updateCroppieImage();
-                });
+            fetchImage('/prev_image');
         }
 
         function nextLabeledImage() {
-            fetch('/next_labeled_image', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    currentIndex = data.index;
-                    updateCroppieImage();
-                });
+            fetchImage('/next_labeled_image');
         }
 
         function prevLabeledImage() {
-            fetch('/prev_labeled_image', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    currentIndex = data.index;
-                    updateCroppieImage();
-                });
+            fetchImage('/prev_labeled_image');
         }
 
-        function saveLabel(coords) {
-            const filename = imageFiles[currentIndex];
+        function saveLabel() {
+
             fetch('/label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, ...coords })
+                body: JSON.stringify({
+                    filename: filename,
+                    'x': cropData.x,
+                    'y': cropData.y,
+                    'd': cropData.delta,
+                })
             }).then(response => response.json())
-              .then(data => {
-                  if (data.success) {
-                      alert('Label saved!');
-                  }
-              });
+            .then(data => {
+                if (data.success) {
+                    alert('Label saved!');
+                } else {
+                    alert('Failed to save label.');
+                }
+            }).catch(error => {
+                console.error('Error saving label:', error);
+                alert('Error saving label. See console for details.');
+            });
         }
+
     </script>
 </body>
 </html>
