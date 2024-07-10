@@ -7,33 +7,32 @@ app = Flask(__name__)
 working_dir = ""
 image_dir = ""
 image_files = []
-current_index = 0
 
-# def get_labeled_image_indices():
-#     """Retrieve and sort the indices of labeled images."""
-#     csv_file_path = os.path.join(working_dir, 'labels.csv')
-#     if not os.path.exists(csv_file_path):
-#         return []
+def get_labeled_image_indices():
+    """Retrieve and sort the indices of labeled images."""
+    csv_file_path = os.path.join(working_dir, 'labels.csv')
+    if not os.path.exists(csv_file_path):
+        return []
 
-#     with open(csv_file_path, 'r', newline='') as file:
-#         reader = csv.reader(file)
-#         next(reader)  # Skip the header
-#         labeled_indices = [image_files.index(row[0]) for row in reader if row[0] in image_files]
-#     labeled_indices.sort()
-#     return labeled_indices
+    with open(csv_file_path, 'r', newline='') as file:
+        reader = csv.reader(file)
+        next(reader)  # Skip the header
+        labeled_indices = [image_files.index(row[0]) for row in reader if row[0] in image_files]
+    labeled_indices.sort()
+    return labeled_indices
 
-# def find_nearest_index(indices, current_index, step):
-#     """Find nearest index in sorted list of labeled indices depending on direction."""
-#     if step > 0:  # next labeled image
-#         for index in indices:
-#             if index > current_index:
-#                 return index
-#         return indices[0] if indices else current_index  # loop to start if not found
-#     else:  # previous labeled image
-#         for index in reversed(indices):
-#             if index < current_index:
-#                 return index
-#         return indices[-1] if indices else current_index  # loop to end if not found
+def find_nearest_index(indices, current_index, step):
+    """Find nearest index in sorted list of labeled indices depending on direction."""
+    if step > 0:  # next labeled image
+        for index in indices:
+            if index > current_index:
+                return index
+        return indices[0] if indices else current_index  # loop to start if not found
+    else:  # previous labeled image
+        for index in reversed(indices):
+            if index < current_index:
+                return index
+        return indices[-1] if indices else current_index  # loop to end if not found
 
 @app.route('/')
 def index():
@@ -47,80 +46,62 @@ def get_image(i):
     img_path = image_files[i]
     return send_from_directory(os.path.join(working_dir, 'images'), img_path)
 
-# @app.route('/image/<filename>')
-# def get_image(filename):
-#     image_dir = os.path.join(working_dir, 'images')
-#     return send_from_directory(image_dir, filename)
+@app.route('/next_labeled_image/<int:i>')
+def next_labeled_image(i):
+    labeled_indices = get_labeled_image_indices()
+    next_index = find_nearest_index(labeled_indices, i, 1)
+    return jsonify(index=next_index)
 
-# @app.route('/next_image', methods=['POST'])
-# def next_image():
-#     global current_index
-#     current_index = (current_index + 1) % len(image_files)  # Loop back to the start if at the end
-#     return jsonify(index=current_index, filename=image_files[current_index])
-
-# @app.route('/prev_image', methods=['POST'])
-# def prev_image():
-#     global current_index
-#     current_index = (current_index - 1 + len(image_files)) % len(image_files)  # Loop back to the end if at the start
-#     return jsonify(index=current_index, filename=image_files[current_index])
-
-# @app.route('/next_labeled_image', methods=['POST'])
-# def next_labeled_image():
-#     labeled_indices = get_labeled_image_indices()
-#     global current_index
-#     current_index = find_nearest_index(labeled_indices, current_index, 1)
-#     return jsonify(index=current_index, filename=image_files[current_index])
-
-# @app.route('/prev_labeled_image', methods=['POST'])
-# def prev_labeled_image():
-#     labeled_indices = get_labeled_image_indices()
-#     global current_index
-#     current_index = find_nearest_index(labeled_indices, current_index, -1)
-#     return jsonify(index=current_index, filename=image_files[current_index])
+@app.route('/prev_labeled_image/<int:i>')
+def prev_labeled_image(i):
+    labeled_indices = get_labeled_image_indices()
+    prev_index = find_nearest_index(labeled_indices, i, -1)
+    return jsonify(index=prev_index)
 
 
-# @app.route('/label', methods=['POST'])
-# def label_image():
-#     data = request.json
+@app.route('/label', methods=['POST'])
+def label_image():
+    data = request.json
 
-#     if data:
-#         filename = data['filename']
-#         labels = [data['x-left'], data['x-right'], data['y-top'], data['y-bottom']]
+    if data:
+        i = data['i']
+        labels = [int(data['x']), int(data['y']), int(data['d'])]
 
-#         csv_file_path = os.path.join(working_dir, 'labels.csv')
+        csv_file_path = os.path.join(working_dir, 'labels.csv')
 
-#         # Check if file exists and read all data, update if filename exists
-#         records = []
-#         header = ['filename', 'x-left', 'x-right', 'y-top', 'y-bottom']
-#         file_exists = os.path.exists(csv_file_path)
+        # Check if file exists and read all data, update if filename exists
+        records = []
+        header = ['i', 'x', 'y', 'd']
+        file_exists = os.path.exists(csv_file_path)
 
-#         if file_exists:
-#             with open(csv_file_path, mode='r', newline='') as file:
-#                 reader = csv.reader(file)
-#                 next(reader)
-#                 updated = False
-#                 for row in reader:
-#                     if row[0] == filename:
-#                         records.append([filename] + labels)
-#                         updated = True
-#                     else:
-#                         records.append(row)
-#                 if not updated:
-#                     records.append([filename] + labels)
-#         else:
-#             records.append([filename] + labels)
+        if file_exists:
+            with open(csv_file_path, mode='r', newline='') as file:
+                reader = csv.reader(file)
+                next(reader)
+                updated = False
+                for row in reader:
+                    if row[0] == str(i):
+                        records.append([i] + labels)
+                        updated = True
+                    else:
+                        records.append(row)
+                if not updated:
+                    records.append([i] + labels)
 
-#         # Write updated data back to CSV
-#         with open(csv_file_path, mode='w', newline='') as file:
-#             writer = csv.writer(file)
-#             if not file_exists:
-#                 writer.writerow(header)
-#             writer.writerows(records)
+            os.remove(csv_file_path)
+        else:
+            records.append([i] + labels)
 
-#         return jsonify(success=True)
+        # Write updated data back to CSV
+        with open(csv_file_path, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(header)
+            writer.writerows(records)
+
+        return jsonify(success=True)
     
-#     else:
-#         return jsonify(success=False)
+    else:
+        return jsonify(success=False)
 
 def label(working_directory: str):
     global working_dir, image_files, current_index

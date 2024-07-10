@@ -17,18 +17,23 @@
         #image-container {
             position: relative;
             margin-top: 20px;
+            height: 256px;
+            width: 256px;
         }
-
         #image {
-            max-width: 512px;
-            max-height: 512px;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         #crop-square {
             position: absolute;
             border: 2px dashed #ff0000;
+            box-sizing: border-box;
             cursor: move;
             width: 100px; /* Initial size */
             height: 100px;
+            max-width: 256px;
+            max-height: 256px;
         }
     </style>
 </head>
@@ -52,10 +57,13 @@
 
     <div class="controls">
         <label for="crop-size">Crop Square Size: </label>
-        <input type="range" id="crop-size" min="50" max="500" value="100" oninput="resizeCropSquare()">
+        <input type="range" id="crop-size" min="50" max="256" value="100" oninput="resizeCropSquare()">
     </div>
 
     <script>
+
+        let current_index = 0;
+        const total_images = {{ total_images }};
 
         let cropData = { x: 0, y: 0, delta: 100 };
         const cropSquare = document.getElementById('crop-square');
@@ -84,6 +92,9 @@
 
                 cropSquare.style.left = x + 'px';
                 cropSquare.style.top = y + 'px';
+
+                cropData.x = x;
+                cropData.y = y;
             }
         });
 
@@ -100,41 +111,47 @@
         }
 
         window.onload = function() {
-            fetchImageByIndex(1);
+            fetchImageByIndex(current_index);
         };
 
         function fetchImageByIndex(index) {
             const imageUrl = `/image/${index}`;
             document.getElementById('image').src = imageUrl;
-        }
-
-        function fetchImage(url) {
-            fetch(url, { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {document.getElementById('image').src = data.filepath;})
-                .catch(error => {
-                    console.error('Error fetching image:', error);
-                });
-        }
-
-        function currentImage() {
-            fetchImage('/current_image');
+            document.getElementById('current-index').innerText = index + 1;
         }
 
         function nextImage() {
-            fetchImage('/next_image');
+            current_index = (current_index + 1) % total_images;
+            fetchImageByIndex(current_index);
         }
 
         function prevImage() {
-            fetchImage('/prev_image');
+            current_index = (current_index - 1 + total_images) % total_images;
+            fetchImageByIndex(current_index);
         }
 
         function nextLabeledImage() {
-            fetchImage('/next_labeled_image');
+            fetch(`/next_labeled_image/${current_index}`, { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    current_index = data.index;
+                    fetchImageByIndex(current_index);
+                })
+                .catch(error => {
+                    console.error('Error fetching next labeled image:', error);
+                });
         }
 
         function prevLabeledImage() {
-            fetchImage('/prev_labeled_image');
+            fetch(`/prev_labeled_image/${current_index}`, { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    current_index = data.index;
+                    fetchImageByIndex(current_index);
+                })
+                .catch(error => {
+                    console.error('Error fetching previous labeled image:', error);
+                });
         }
 
         function saveLabel() {
@@ -143,7 +160,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    filename: filename,
+                    'i': current_index,
                     'x': cropData.x,
                     'y': cropData.y,
                     'd': cropData.delta,
