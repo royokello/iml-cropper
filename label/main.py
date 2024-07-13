@@ -8,16 +8,18 @@ working_dir = ""
 image_dir = ""
 image_files = []
 
-def get_labeled_image_indices():
-    """Retrieve and sort the indices of labeled images."""
+def get_labeled_image_indices() -> list[int]:
+    """
+    Retrieve and sort the indices of labeled images.
+    """
     csv_file_path = os.path.join(working_dir, 'labels.csv')
     if not os.path.exists(csv_file_path):
         return []
 
     with open(csv_file_path, 'r', newline='') as file:
         reader = csv.reader(file)
-        next(reader)  # Skip the header
-        labeled_indices = [image_files.index(row[0]) for row in reader if row[0] in image_files]
+        next(reader)
+        labeled_indices = [int(row[0]) for row in reader]
     labeled_indices.sort()
     return labeled_indices
 
