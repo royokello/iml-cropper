@@ -1,6 +1,8 @@
+import logging
 import os
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 def get_latest_checkpoint(model_dir) -> str | None:
     model_files = [f for f in os.listdir(model_dir) if f.endswith('.pth')]
@@ -12,11 +14,21 @@ def get_latest_checkpoint(model_dir) -> str | None:
 def load_model(model_dir: str) -> FasterRCNN:
     model = fasterrcnn_resnet50_fpn(pretrained=False)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = torch.nn.Linear(in_features, 2)  # 2 classes: background and crop region
+    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 3)
 
     latest_checkpoint = get_latest_checkpoint(model_dir)
     if latest_checkpoint:
         model.load_state_dict(torch.load(latest_checkpoint))
         print(f"Loaded model from {latest_checkpoint}")
-    model.eval()
+    
     return model
+
+def setup_logging(working_dir):
+    log_file_path = os.path.join(working_dir, 'training.log')
+
+    logging.basicConfig(
+        filename=log_file_path,
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )

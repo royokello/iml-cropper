@@ -47,6 +47,7 @@
         <button onclick="nextImage()">Next</button>
         <button onclick="prevLabeledImage()">Previous Labeled</button>
         <button onclick="nextLabeledImage()">Next Labeled</button>
+        <button onclick="getRandomImage()">Random</button>
         <button onclick="saveLabel()">Save Label</button>
     </div>
 
@@ -152,6 +153,12 @@
                 .catch(error => {
                     console.error('Error fetching previous labeled image:', error);
                 });
+        }
+
+        function getRandomImage() {
+            random_index = Math.floor(Math.random() * total_images);
+            current_index = random_index;
+            fetchImageByIndex(random_index);
         }
 
         function saveLabel() {

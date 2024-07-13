@@ -108,7 +108,7 @@ def label_image():
 def label(working_directory: str):
     global working_dir, image_files, current_index
     working_dir = working_directory
-    image_dir = os.path.join(working_dir, 'images')
+    image_dir = os.path.join(working_dir, '512p')
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     current_index = 0
     app.run(debug=True)
