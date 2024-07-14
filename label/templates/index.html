@@ -49,6 +49,7 @@
         <button onclick="nextLabeledImage()">Next Labeled</button>
         <button onclick="getRandomImage()">Random</button>
         <button onclick="saveLabel()">Save Label</button>
+        <button onclick="getCropPrediction()">Predict Crop</button>
     </div>
 
     <div id="image-container">
@@ -159,6 +160,25 @@
             random_index = Math.floor(Math.random() * total_images);
             current_index = random_index;
             fetchImageByIndex(random_index);
+        }
+
+        function getCropPrediction() {
+            fetch(`/predict_crop/${current_index}`, { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data)
+                    cropSquare.style.left = data.x + 'px';
+                    cropSquare.style.top = data.y + 'px';
+                    cropSquare.style.width = data.d + 'px';
+                    cropSquare.style.height = data.d + 'px';
+
+                    cropData.x = x;
+                    cropData.y = y;
+                    cropData.delta = d;
+                })
+                .catch(error => {
+                    console.error('Error fetching crop prediction:', error);
+                });
         }
 
         function saveLabel() {

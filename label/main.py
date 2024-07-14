@@ -3,10 +3,13 @@ import csv
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 
+from utils import load_model, predict
+
 app = Flask(__name__)
 working_dir = ""
 image_dir = ""
 image_files = []
+model = None
 
 def get_labeled_image_indices() -> list[int]:
     """
@@ -44,9 +47,8 @@ def index():
 
 @app.route('/image/<int:i>')
 def get_image(i):
-    global image_files, working_dir
-    img_path = image_files[i]
-    return send_from_directory(os.path.join(working_dir, 'images'), img_path)
+    global image_dir
+    return send_from_directory(image_dir, f"{i}.png")
 
 @app.route('/next_labeled_image/<int:i>')
 def next_labeled_image(i):
@@ -105,12 +107,21 @@ def label_image():
     else:
         return jsonify(success=False)
 
+@app.route('/predict_crop/<int:i>')
+def predict_crop(i):
+    global image_dir, model
+    img_path = os.path.join(image_dir, f"{i}.png")
+    prediction = predict(model, img_path)
+    return jsonify(prediction)
+
+
 def label(working_directory: str):
-    global working_dir, image_files, current_index
+    global working_dir, image_files, current_index, image_dir, model
     working_dir = working_directory
-    image_dir = os.path.join(working_dir, '512p')
+    image_dir = os.path.join(working_dir, '256p')
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     current_index = 0
+    model = load_model(working_dir)
     app.run(debug=True)
 
 if __name__ == "__main__":
