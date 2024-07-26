@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -14,7 +15,7 @@ def get_latest_checkpoint(model_dir) -> str | None:
     latest_model_file = max(model_files, key=lambda x: int(x.split('.')[0]))
     return os.path.join(model_dir, latest_model_file)
 
-def load_model(model_dir: str) -> FasterRCNN:
+def load_model(model_dir: str, ) -> FasterRCNN:
     model = fasterrcnn_resnet50_fpn(pretrained=False)
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 3)
@@ -35,34 +36,23 @@ def setup_logging(working_dir):
         format='%(asctime)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-
-def predict(model: FasterRCNN, image_path: str) -> dict[str, int]:
+    
+def generate_model_name(base_model: str | None, samples: int, epochs: int) -> str:
     """
-    Predicts the x, y, d values for cropping.
+    Generate a unique model name based on current timestamp, base model (if any), number of samples, and epochs.
+
+    Args:
+    base_model (str | None): Name of the base model if continuing training, or None if starting from scratch.
+    samples (int): Number of samples used in training.
+    epochs (int): Number of epochs the model was trained for.
+
+    Returns:
+    str: A unique model name string.
     """
-    model.eval()
+    result = f"{int(time.time())}"
+    if base_model:
+        result += f"_b={base_model}"
     
-    transform = transforms.Compose([
-        transforms.Resize((256, 256)),
-        transforms.ToTensor()
-    ])
+    result += f"_s={samples}_e={epochs}"
     
-    image = Image.open(image_path).convert('RGB')
-    image = transform(image).unsqueeze(0)  # Add batch dimension
-
-    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    image = image.to(device)
-    model = model.to(device)
-
-    with torch.no_grad():
-        outputs = model(image)
-
-    output = outputs[0]
-    
-    if 'boxes' in output and len(output['boxes']) > 0:
-        box = output['boxes'][0].cpu().numpy()
-        x, y, x2, y2 = box
-        d = max(x2 - x, y2 - y)
-        return {'x': int(x), 'y': int(y), 'd': int(d)}
-    else:
-        return {'x': 0, 'y': 0, 'd': 0}
+    return result
