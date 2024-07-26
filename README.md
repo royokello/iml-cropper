@@ -1,8 +1,12 @@
-# ai-cropper
-ai-cropper is a Python library for training an image cropping model with a few samples and batch cropping images in a directory.
+# ML Cropper
+ml-cropper is a Python library for training an image cropping model with a few samples and batch cropping images in a directory.
 
 # Installation
-`pip install -r requirements`
+```
+git clone https://github.com/royokello/ml-cropper.git
+cd ml-cropper
+pip install -r requirements.txt
+```
 
 # Usage
 
