@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Labeling Tool</title>
+    <title>ML Cropper: Image Labeling</title>
     <style>
         body {
             display: flex;
@@ -38,6 +38,7 @@
     </style>
 </head>
 <body>
+    <h1>ML Cropper: Image Labeling</h1>
     <div id="image-info">
         <span id="current-index">1</span> / <span id="total-images">{{ total_images }}</span>
     </div>
@@ -64,7 +65,7 @@
 
     <script>
 
-        let current_index = 0;
+        let current_index = 1;
         const total_images = {{ total_images }};
 
         let cropData = { x: 0, y: 0, delta: 100 };
@@ -119,7 +120,7 @@
         function fetchImageByIndex(index) {
             const imageUrl = `/image/${index}`;
             document.getElementById('image').src = imageUrl;
-            document.getElementById('current-index').innerText = index + 1;
+            document.getElementById('current-index').innerText = index;
         }
 
         function nextImage() {

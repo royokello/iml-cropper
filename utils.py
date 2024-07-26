@@ -57,14 +57,12 @@ def predict(model: FasterRCNN, image_path: str) -> dict[str, int]:
     with torch.no_grad():
         outputs = model(image)
 
-    # Assuming the model returns a list of dictionaries and we're interested in the first prediction
     output = outputs[0]
     
-    # Extract the first bounding box (if multiple, you can handle accordingly)
     if 'boxes' in output and len(output['boxes']) > 0:
         box = output['boxes'][0].cpu().numpy()
         x, y, x2, y2 = box
-        d = max(x2 - x, y2 - y)  # Assuming d is the largest side of the bounding box
+        d = max(x2 - x, y2 - y)
         return {'x': int(x), 'y': int(y), 'd': int(d)}
     else:
         return {'x': 0, 'y': 0, 'd': 0}

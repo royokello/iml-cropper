@@ -20,10 +20,8 @@ class CropDataset(Dataset):
 
         with open(labels_file, 'r') as file:
             reader = csv.reader(file)
-            next(reader, None)  # Skip the header row if your CSV has one
+            next(reader, None)
             for row in reader:
-                # Assuming the CSV columns are in the order: image_id, x, y, delta
-                # Convert x, y, delta to float and store them with the image filename
                 self.labels.append({
                     'i': row[0],
                     'x': float(row[1]),
