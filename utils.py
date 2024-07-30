@@ -1,3 +1,5 @@
+from datetime import datetime
+import json
 import logging
 import os
 import time
@@ -6,6 +8,8 @@ from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 import torchvision.transforms as transforms
 from PIL import Image
+
+from model import CropperViT
 
 
 def get_latest_checkpoint(model_dir) -> str | None:
@@ -40,14 +44,6 @@ def setup_logging(working_dir):
 def generate_model_name(base_model: str | None, samples: int, epochs: int) -> str:
     """
     Generate a unique model name based on current timestamp, base model (if any), number of samples, and epochs.
-
-    Args:
-    base_model (str | None): Name of the base model if continuing training, or None if starting from scratch.
-    samples (int): Number of samples used in training.
-    epochs (int): Number of epochs the model was trained for.
-
-    Returns:
-    str: A unique model name string.
     """
     result = f"{int(time.time())}"
     if base_model:
@@ -56,3 +52,45 @@ def generate_model_name(base_model: str | None, samples: int, epochs: int) -> st
     result += f"_s={samples}_e={epochs}"
     
     return result
+
+def get_model_by_name(device: torch.device, directory: str|None=None, name: str|None=None) -> CropperViT:
+    """
+    Load a model whose filename starts with the given name from the specified directory and move it to the specified device.
+    """
+    result = CropperViT().to(device)
+
+    if directory and name:
+        for file in os.listdir(directory):
+            if file.startswith(name):
+                model_path = os.path.join(directory, file)
+                break
+        else:
+            raise ValueError(f"No model starting with {name} found in {directory}")
+
+        result.load_state_dict(torch.load(model_path))
+    
+    return result
+
+def get_labels(directory: str) -> dict[int, list[int]]:
+    """
+    Load labels from a JSON file in the specified directory.
+    """
+    labels_file = os.path.join(directory, 'labels.json')
+    if os.path.exists(labels_file):
+        with open(labels_file, 'r') as f:
+            labels = json.load(f)
+    else:
+        labels = {}
+    return labels
+
+def save_labels(directory: str, labels: dict[int, list[int]]):
+    """
+    Save labels to a JSON file in the specified directory.
+    """
+    labels_file = os.path.join(directory, 'labels.json')
+    with open(labels_file, 'w') as f:
+        json.dump(labels, f, indent=4)
+
+def log_print(message):
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{current_time}] {message}")

@@ -1,30 +1,14 @@
 import argparse
+from datetime import datetime
 import os
-import json
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from torchvision import transforms
-from PIL import Image
 from tqdm import tqdm
+from dataset import ImageDataset
+from utils import generate_model_name, get_model_by_name, log_print
 
-from transformers import ViTModel, ViTConfig
-import torch.nn as nn
-import torch.nn.functional as F
-
-from utils import generate_model_name
-
-class CropperViT(nn.Module):
-    def __init__(self, num_coords=4):
-        super().__init__()
-        self.vit = ViTModel.from_pretrained('google/vit-base-patch16-256')
-        self.regressor = nn.Linear(self.vit.config.hidden_size, num_coords)
-
-    def forward(self, pixel_values):
-        outputs = self.vit(pixel_values=pixel_values)
-        crop_coords = self.regressor(outputs.last_hidden_state[:, 0])
-        return crop_coords
-
-def train(working_dir: str, epochs: int, checkpoint: int, base_model: str | None):
+def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     """
     Start or continue training the masking model.
     Models are located in the 'model' subdirectory of the working directory.
@@ -33,56 +17,26 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str | None
     checkpoint - save model after this many epochs
     base_model - specify model to continue training from
     """
+    log_print("training started ...")
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    log_print(f"using {device}")
     
     # Setup directories
     model_dir = os.path.join(working_dir, 'model')
-    image_dir = os.path.join(working_dir, 'images')
+    image_dir = os.path.join(working_dir, '256p')
     labels_file = os.path.join(working_dir, 'labels.json')
     os.makedirs(model_dir, exist_ok=True)
 
     # Initialize model
-    model = CropperViT().to(device)
-    if base_model:
-        model.load_state_dict(torch.load(os.path.join(model_dir, base_model)))
-        print(f"Loaded base model: {base_model}")
+    model = get_model_by_name(device=device, directory=model_dir, name=base_model)
 
     # Define dataset and dataloader
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
     ])
-
-    class ImageDataset(Dataset):
-        def __init__(self, image_dir, labels_file, transform=None):
-            self.image_dir = image_dir
-            self.transform = transform
-            self.labels = self.load_labels(labels_file)
-            self.labeled_images = self.get_labeled_images()
-
-        def load_labels(self, labels_file):
-            with open(labels_file, 'r') as f:
-                return {int(k): v for k, v in json.load(f).items()}
-
-        def get_labeled_images(self):
-            return [f"{id}.png" for id in self.labels.keys() 
-                    if os.path.exists(os.path.join(self.image_dir, f"{id}.png"))]
-
-        def __len__(self):
-            return len(self.labeled_images)
-
-        def __getitem__(self, idx):
-            img_name = self.labeled_images[idx]
-            image_path = os.path.join(self.image_dir, img_name)
-            image = Image.open(image_path).convert('RGB')
-            if self.transform:
-                image = self.transform(image)
-            
-            # Extract the ID from the filename (remove '.png' and convert to int)
-            img_id = int(img_name[:-4])
-            crop_coords = torch.tensor(self.labels[img_id])
-            return image, crop_coords
 
     dataset = ImageDataset(image_dir, labels_file, transform=transform)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4)
@@ -95,7 +49,9 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str | None
     for epoch in range(epochs):
         model.train()
         epoch_loss = 0
-        for images, labels in tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}"):
+
+        for images, labels in tqdm(dataloader):
+
             images, labels = images.to(device), labels.to(device)
             
             optimizer.zero_grad()
@@ -106,7 +62,7 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str | None
 
             epoch_loss += loss.item()
 
-        print(f"Epoch {epoch+1} loss: {epoch_loss/len(dataloader):.4f}")
+        log_print(f" * epoch {epoch+1}, loss: {epoch_loss/len(dataloader):.4f}")
 
         # Save checkpoint
         if (epoch + 1) % checkpoint == 0:
