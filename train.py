@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime
 import os
 import torch
 from torch.utils.data import DataLoader
@@ -62,20 +61,14 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
 
             epoch_loss += loss.item()
 
-        log_print(f" * epoch {epoch+1}, loss: {epoch_loss/len(dataloader):.4f}")
+        log_print(f" * epoch: {epoch+1}, loss: {epoch_loss/len(dataloader):.4f}")
 
         # Save checkpoint
         if (epoch + 1) % checkpoint == 0:
             checkpoint_name = generate_model_name(base_model, len(dataset), epoch + 1)
             checkpoint_path = os.path.join(model_dir, f"{checkpoint_name}.pth")
             torch.save(model.state_dict(), checkpoint_path)
-            print(f"Checkpoint saved: {checkpoint_path}")
-
-    # Save final model
-    final_model_name = generate_model_name(base_model, len(dataset), epochs)
-    final_model_path = os.path.join(model_dir, f"{final_model_name}.pth")
-    torch.save(model.state_dict(), final_model_path)
-    print(f"Final model saved: {final_model_path}")
+            log_print(f"checkpoint saved: {checkpoint_path}")
 
 if __name__ == "__main__":
 

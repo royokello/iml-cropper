@@ -12,74 +12,60 @@ image_files = []
 model = None
 labels: dict[int, list[int]] = {}
 
-def get_labeled_image_indices() -> list[int]:
+def get_next_img_id(img_id: int, positive_step: bool, labels: dict[int, list[int]]) -> int:
     """
-    Retrieve and sort the indices of labeled images.
+    Get the next image ID based on the current image ID and step direction.
+    If positive_step is True, move to the next image ID with labels, otherwise move to the previous.
+    If the end of the list is reached, wrap around to the beginning or end accordingly.
     """
-    csv_file_path = os.path.join(working_dir, 'labels.csv')
-    if not os.path.exists(csv_file_path):
-        return []
+    labeled_ids = sorted(labels.keys())
+    if not labeled_ids:
+        return img_id
+    
+    if img_id in labeled_ids:
+        current_index = labeled_ids.index(img_id)
+    else:
+        current_index = min(range(len(labeled_ids)), key=lambda i: abs(labeled_ids[i] - img_id))
 
-    with open(csv_file_path, 'r', newline='') as file:
-        reader = csv.reader(file)
-        next(reader)
-        labeled_indices = [int(row[0]) for row in reader]
-    labeled_indices.sort()
-    return labeled_indices
+    if positive_step:
+        next_index = (current_index + 1) % len(labeled_ids)
+    else:
+        next_index = (current_index - 1) % len(labeled_ids)
 
-def find_nearest_index(indices, current_index, step):
-    """Find nearest index in sorted list of labeled indices depending on direction."""
-    if step > 0:  # next labeled image
-        for index in indices:
-            if index > current_index:
-                return index
-        return indices[0] if indices else current_index  # loop to start if not found
-    else:  # previous labeled image
-        for index in reversed(indices):
-            if index < current_index:
-                return index
-        return indices[-1] if indices else current_index  # loop to end if not found
+    return labeled_ids[next_index]
+
 
 @app.route('/')
 def index():
-    global current_index, image_files
+    global current_index, image_files, labels
     total_images = len(image_files)
-    return render_template('index.html', total_images=total_images)
+    total_labels = len(labels)
+    return render_template('index.html', total_images=total_images, total_labels=total_labels)
 
-@app.route('/image/<int:i>')
-def get_image(i):
+@app.route('/image/<int:img_id>')
+def get_image(img_id):
     global image_dir
-    return send_from_directory(image_dir, f"{i}.png")
+    return send_from_directory(image_dir, f"{img_id}.png")
 
-@app.route('/next_labeled_image/<int:i>')
-def next_labeled_image(i):
-    labeled_indices = get_labeled_image_indices()
-    next_index = find_nearest_index(labeled_indices, i, 1)
-    return jsonify(index=next_index)
-
-@app.route('/prev_labeled_image/<int:i>')
-def prev_labeled_image(i):
-    labeled_indices = get_labeled_image_indices()
-    prev_index = find_nearest_index(labeled_indices, i, -1)
-    return jsonify(index=prev_index)
-
+@app.route('/next_labeled_image', methods=['POST'])
+def next_labeled_image():
+    global labels
+    print("next_labeled_image ...")
+    data = request.json
+    if data:
+        next_img_id = get_next_img_id(img_id=int(data["id"]), positive_step=data["step"], labels=labels)
+        return jsonify(img_id=next_img_id)
+    else:
+        return jsonify(img_id=1)
 
 @app.route('/label', methods=['POST'])
 def label_image():
     global labels, working_dir
-
     data = request.json
-
     if data:
-        id = int(data['id'])
-        sample = [int(data['x1']), int(data['x2']), int(data['y1']), int(data['y2'])]
-
-        labels[id] = sample
-        
+        labels[data["id"]] = [data['x1'], data['x2'], data['y1'], data['y2']]
         save_labels(directory=working_dir, labels=labels)
-
         return jsonify(success=True)
-    
     else:
         return jsonify(success=False)
 

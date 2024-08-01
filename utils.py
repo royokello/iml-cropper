@@ -79,6 +79,8 @@ def get_labels(directory: str) -> dict[int, list[int]]:
     if os.path.exists(labels_file):
         with open(labels_file, 'r') as f:
             labels = json.load(f)
+
+        labels = {int(k): v for k, v in labels.items()}
     else:
         labels = {}
     return labels
@@ -92,5 +94,5 @@ def save_labels(directory: str, labels: dict[int, list[int]]):
         json.dump(labels, f, indent=4)
 
 def log_print(message):
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{current_time}] {message}")
+    print(message)
+    logging.info(message)
