@@ -5,8 +5,10 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 from dataset import ImageDataset
-from utils import generate_model_name, get_model_by_name, log_print
+from utils import generate_model_name, get_model_by_name, log_print, setup_logging
+from transformers import ViTFeatureExtractor
 
+    
 def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     """
     Start or continue training the masking model.
@@ -16,6 +18,7 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     checkpoint - save model after this many epochs
     base_model - specify model to continue training from
     """
+    setup_logging(working_dir)
     log_print("training started ...")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -30,11 +33,13 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     # Initialize model
     model = get_model_by_name(device=device, directory=model_dir, name=base_model)
 
+    feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224')
+
     # Define dataset and dataloader
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
     ])
 
     dataset = ImageDataset(image_dir, labels_file, transform=transform)
@@ -42,7 +47,7 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
 
     # Define loss function and optimizer
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001) # type: ignore
 
     # Training loop
     for epoch in range(epochs):
@@ -53,9 +58,10 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
 
             images, labels = images.to(device), labels.to(device)
             
-            optimizer.zero_grad()
             outputs = model(images)
             loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 

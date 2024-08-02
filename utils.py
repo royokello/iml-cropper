@@ -1,35 +1,10 @@
-from datetime import datetime
 import json
 import logging
 import os
 import time
 import torch
-from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN
-from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
-import torchvision.transforms as transforms
-from PIL import Image
 
-from model import CropperViT
-
-
-def get_latest_checkpoint(model_dir) -> str | None:
-    model_files = [f for f in os.listdir(model_dir) if f.endswith('.pth')]
-    if not model_files:
-        return None
-    latest_model_file = max(model_files, key=lambda x: int(x.split('.')[0]))
-    return os.path.join(model_dir, latest_model_file)
-
-def load_model(model_dir: str, ) -> FasterRCNN:
-    model = fasterrcnn_resnet50_fpn(pretrained=False)
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_features, 3)
-
-    latest_checkpoint = get_latest_checkpoint(model_dir)
-    if latest_checkpoint:
-        model.load_state_dict(torch.load(latest_checkpoint))
-        print(f"Loaded model from {latest_checkpoint}")
-    
-    return model
+from model import CropPredictor
 
 def setup_logging(working_dir):
     log_file_path = os.path.join(working_dir, 'training.log')
@@ -53,11 +28,11 @@ def generate_model_name(base_model: str | None, samples: int, epochs: int) -> st
     
     return result
 
-def get_model_by_name(device: torch.device, directory: str|None=None, name: str|None=None) -> CropperViT:
+def get_model_by_name(device: torch.device, directory: str|None=None, name: str|None=None) -> CropPredictor:
     """
     Load a model whose filename starts with the given name from the specified directory and move it to the specified device.
     """
-    result = CropperViT().to(device)
+    result = CropPredictor().to(device)
 
     if directory and name:
         for file in os.listdir(directory):
@@ -66,6 +41,26 @@ def get_model_by_name(device: torch.device, directory: str|None=None, name: str|
                 break
         else:
             raise ValueError(f"No model starting with {name} found in {directory}")
+
+        result.load_state_dict(torch.load(model_path))
+    
+    return result
+
+def get_model_by_latest(device: torch.device, directory: str|None=None) -> CropPredictor:
+    """
+    Load a model whose model name is the latest time from the specified directory and move it to the specified device.
+    """
+    result = CropPredictor().to(device)
+
+    if directory and os.path.exists(directory):
+        model_files = [f for f in os.listdir(directory) if f.endswith('.pth')]
+        if not model_files:
+            raise ValueError(f"No model files found in {directory}")
+
+        latest_model = max(model_files, key=lambda x: int(x.split('_')[0]))
+        print(f"latest model: {latest_model}")
+        
+        model_path = os.path.join(directory, latest_model)
 
         result.load_state_dict(torch.load(model_path))
     

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ML Cropper: Image Labeling</title>
+    <title>ML Cropper GUI</title>
     <style>
         body {
             display: flex;
@@ -38,23 +38,19 @@
     </style>
 </head>
 <body>
-    <h1>ML Cropper: Image Labeling</h1>
+    <h1>ML Cropper GUI</h1>
     <!-- <div id="image-info">
         <span id="current-index">1</span> / <span id="total-images">{{ total_images }}</span>
     </div> -->
 
     <div>
         <p>Current Index: <span id="current-index">1</span> / {{ total_images }}</p>
-    </div>
-
-    <div>
-        <h3>Labeled</h3>
-        <p>Total: <span id="total-labels">{{ total_labels }}</span></p>
+        <p>Total Labeled: <span id="total-labels">{{ total_labels }}</span></p>
 
         <label><input type="radio" name="step" value="false" onclick="updateStep(false)"> NEG(-)</label>
         <label><input type="radio" name="step" value="true" checked onclick="updateStep(true)"> POS(+)</label>
 
-        <button onclick="nextLabeledImage()">Next Image</button>
+        <button onclick="nextLabeledImage()">Next Labeled Image</button>
     </div>
 
     <div class="controls">
@@ -145,6 +141,13 @@
             crop_data.y2 = crop_data.y1 + crop_size;
         }
 
+        function drawCropSquare(x1, y1, x2, y2) {
+            crop_square.style.left = `${x1}px`;
+            crop_square.style.top = `${y1}px`;
+            crop_square.style.width = `${x2 - x1}px`;
+            crop_square.style.height = `${y2 - y1}px`;
+        }
+
         window.onload = function() {
             fetchImageByIndex(current_index);
         };
@@ -196,14 +199,21 @@
             fetch(`/predict_crop/${current_index}`, { method: 'GET' })
                 .then(response => response.json())
                 .then(data => {
-                    crop_square.style.left = data.x + 'px';
-                    crop_square.style.top = data.y + 'px';
-                    crop_square.style.width = data.d + 'px';
-                    crop_square.style.height = data.d + 'px';
+                    console.log(data)
+                    let prediction = data.prediction;
 
-                    crop_data.x = x;
-                    crop_data.y = y;
-                    crop_data.delta = d;
+                    let image_width = document.getElementById('image').width;
+                    let image_height = document.getElementById('image').height;
+
+                    let x_padding = (256 - image_width) / 2;
+                    let y_padding = (256 - image_height) / 2;
+
+                    crop_data.x1 = prediction[0] * image_width + x_padding;
+                    crop_data.x2 = prediction[1] * image_width + x_padding;
+                    crop_data.y1 = prediction[2] * image_height + y_padding;
+                    crop_data.y2 = prediction[3] * image_height + y_padding;
+
+                    drawCropSquare(crop_data.x1, crop_data.y1, crop_data.x2, crop_data.y2);
                 })
                 .catch(error => {
                     console.error('Error fetching crop prediction:', error);
@@ -211,15 +221,29 @@
         }
 
         function saveLabel() {
+
+            let image_width = document.getElementById('image').width;
+            let image_height = document.getElementById('image').height;
+
+            x_padding = (256 - image_width) / 2
+            y_padding = (256 - image_height) / 2
+
+            adj_coord = {
+                x1: crop_data.x1 - x_padding,
+                y1: crop_data.y1 - y_padding,
+                x2: crop_data.x2 - x_padding,
+                y2: crop_data.y2 - y_padding
+            }
+
             fetch('/label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     'id': current_index,
-                    'x1': crop_data.x1,
-                    'x2': crop_data.x2,
-                    'y1': crop_data.y1,
-                    'y2': crop_data.y2
+                    'x1': adj_coord.x1 / image_width,
+                    'y1': adj_coord.y1 / image_height,
+                    'x2': adj_coord.x2 / image_width,
+                    'y2': adj_coord.y2 / image_height
                 })
             }).then(response => response.json())
             .then(data => {

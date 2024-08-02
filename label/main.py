@@ -3,7 +3,10 @@ import csv
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import os
 
-from utils import get_labels, load_model, save_labels
+import torch
+
+from predict import predict
+from utils import get_labels, get_model_by_latest, get_model_by_name, save_labels
 
 app = Flask(__name__)
 working_dir = ""
@@ -11,6 +14,7 @@ image_dir = ""
 image_files = []
 model = None
 labels: dict[int, list[int]] = {}
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def get_next_img_id(img_id: int, positive_step: bool, labels: dict[int, list[int]]) -> int:
     """
@@ -63,28 +67,31 @@ def label_image():
     global labels, working_dir
     data = request.json
     if data:
-        labels[data["id"]] = [data['x1'], data['x2'], data['y1'], data['y2']]
+        labels[data["id"]] = [data['x1'], data['y1'], data['x2'], data['y2']]
         save_labels(directory=working_dir, labels=labels)
         return jsonify(success=True)
     else:
         return jsonify(success=False)
 
-# @app.route('/predict_crop/<int:i>')
-# def predict_crop(i):
-#     global image_dir, model
-#     img_path = os.path.join(image_dir, f"{i}.png")
-#     prediction = predict(model, img_path)
-#     return jsonify(prediction)
+@app.route('/predict_crop/<int:img_id>')
+def predict_crop(img_id):
+    global image_dir, model, device
+    model = get_model_by_name(device=device, )
+    img_path = os.path.join(image_dir, f"{img_id}.png")
+    prediction = predict(device=device, model=model, image_path=img_path)
+    print(" * prediction: {prediction}")
+    return jsonify(prediction=prediction)
 
 
 def label(working_directory: str):
-    global working_dir, image_files, current_index, image_dir, model, labels
+    global working_dir, image_files, current_index, image_dir, model, labels, device
     working_dir = working_directory
     image_dir = os.path.join(working_dir, '256p')
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
     current_index = 0
     labels = get_labels(directory=working_dir)
-    model = load_model(working_dir)
+    model_dir = os.path.join(working_dir, 'model')
+    model = get_model_by_latest(device=device, directory=model_dir)
     app.run(debug=True)
 
 if __name__ == "__main__":
