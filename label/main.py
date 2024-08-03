@@ -6,7 +6,7 @@ import os
 import torch
 
 from predict import predict
-from lib import get_labels, get_model_by_latest, get_model_by_name, save_labels
+from utils import get_labels, get_model_by_latest, get_model_by_name, save_labels
 
 app = Flask(__name__)
 working_dir = ""
@@ -85,7 +85,7 @@ def predict_crop(img_id):
 def label(working_directory: str):
     global working_dir, image_files, current_index, image_dir, model, labels, device
     working_dir = working_directory
-    image_dir = os.path.join(working_dir, '256p')
+    image_dir = os.path.join(working_dir, 'input', '256p')
     image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png'))]
     current_index = 0
     labels = get_labels(directory=working_dir)

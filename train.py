@@ -5,7 +5,7 @@ import torchvision.transforms as transforms
 import os
 from torch.utils.data import Dataset, DataLoader
 from dataset import ImageDataset
-from lib import generate_model_name, log_print, setup_logging
+from utils import generate_model_name, get_model_by_name, log_print, setup_logging
 import torch.nn.functional as F
 
 from model import CropNet
@@ -26,7 +26,7 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     models_dir = os.path.join(working_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
 
-    image_dir = os.path.join(working_dir, '256p')
+    image_dir = os.path.join(working_dir, 'input', '256p')
     labels_file = os.path.join(working_dir, 'labels.json')
 
     # Define transforms
@@ -39,8 +39,12 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
 
     # Initialize the model, optimizer, and loss function
-    model = CropNet().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    if base_model:
+        model = get_model_by_name(device=device, directory=models_dir, name=base_model)
+    else:
+        model = CropNet().to(device)
+        
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4) # type: ignore
 
     for epoch in range(epochs):
         model.train()

@@ -4,53 +4,59 @@ from PIL import Image
 import numpy as np
 import torch
 
-from lib import load_model
+from utils import get_model_by_latest, get_model_by_name
+from predict import predict
 
-def image_to_tensor(image: Image.Image, device: torch.device) -> torch.Tensor:
-    """
-    Transforms a PIL Image to a torch Tensor, adds a batch dimension, and moves it to the specified device.
-    """
-    image = image.resize((256, 256))
-    image_tensor = torch.tensor(np.array(image)).permute(2, 0, 1).float() / 255.0  # HWC to CHW and normalize
-    image_tensor = image_tensor.unsqueeze(0)
-    image_tensor = image_tensor.to(device)
-    return image_tensor
 
-def crop(working_dir: str):
+def crop(working_dir: str, model_name: str|None=None):
     """
-    Crops images in the images subdirectory into the output subdirectory.
     """
-    image_dir = os.path.join(working_dir, 'images')
-    output_dir = os.path.join(working_dir, 'output')
-    model_dir = os.path.join(working_dir, 'model')
-    os.makedirs(output_dir, exist_ok=True)
+    models_dir = os.path.join(working_dir, 'models')
     
     # Load the trained model
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-    model = load_model(model_dir).to(device)
 
-    for image_name in os.listdir(image_dir):
-        if image_name.endswith(('.jpg', '.png')):
-            image_path = os.path.join(image_dir, image_name)
-            image_object = Image.open(image_path).convert("RGB")
-            image_tensor: torch.Tensor = image_to_tensor(image=image_object, device=device)
+    if model_name:
+        model = get_model_by_name(device=device, directory=models_dir, name=model_name)
+    else:
+        model = get_model_by_latest(device=device, directory=models_dir)
 
-            with torch.no_grad():
-                predictions = model(image_tensor)
+    low_input_dir = os.path.join(working_dir, 'input', '256p')
+
+    low_output_dir = os.path.join(working_dir, 'output', '256p')
+    std_output_dir = os.path.join(working_dir, 'output', '512p')
+    os.makedirs(low_output_dir, exist_ok=True)
+    os.makedirs(std_output_dir, exist_ok=True)
+
+    for img_name in os.listdir(low_input_dir):
+
+        low_input_path = os.path.join(low_input_dir, img_name)
+        
+        prediction = predict(device=device, model=model, image_path=low_input_path)
+
+        high_input_path = os.path.join(working_dir, 'input', '1024p', img_name)
+
+        # Open the image
+        high_input_image = Image.open(high_input_path)
+
+        # Apply the predicted crop
+        x1, y1, x2, y2 = [int(p * 1024) for p in prediction]
+        cropped_image = high_input_image.crop((x1, y1, x2, y2))
+
+        resolutions = [
+            (256, low_output_dir),
+            (512, std_output_dir)
+        ]
+
+        for (output_res, img_output_dir) in resolutions:
+            # Resize the cropped image to the specified resolution
+            resized_image = cropped_image.resize((output_res, output_res), Image.LANCZOS) # type: ignore
             
-            boxes = predictions[0]['boxes'].cpu().numpy()
-            scores = predictions[0]['scores'].cpu().numpy()
+            # Save the resized cropped image to the output directory
+            img_output_path = os.path.join(img_output_dir, img_name)
+            resized_image.save(img_output_path)
 
-            # Filter boxes with a confidence score above a threshold (e.g., 0.5)
-            threshold = 0.5
-            boxes = boxes[scores >= threshold]
-
-            if len(boxes) > 0:
-                box = boxes[0]  # Taking the first box for simplicity
-                cropped_image = image_object.crop((box[0], box[1], box[2], box[3]))
-                output_path = os.path.join(output_dir, image_name)
-                cropped_image.save(output_path)
-                print(f"Cropped and saved {image_name}")
+            print(f"cropped and resized image saved to {img_output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Crop images in a specified directory.")
