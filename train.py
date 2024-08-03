@@ -1,78 +1,69 @@
 import argparse
-import os
 import torch
 from torch.utils.data import DataLoader
-from torchvision import transforms
-from tqdm import tqdm
+import torchvision.transforms as transforms
+import os
+from torch.utils.data import Dataset, DataLoader
 from dataset import ImageDataset
-from utils import generate_model_name, get_model_by_name, log_print, setup_logging
-from transformers import ViTFeatureExtractor
+from lib import generate_model_name, log_print, setup_logging
+import torch.nn.functional as F
 
-    
+from model import CropNet
+
+import torch.nn.functional as F
+
+def bbox_loss(pred, target):
+    return F.smooth_l1_loss(pred, target)
+
 def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
-    """
-    Start or continue training the masking model.
-    Models are located in the 'model' subdirectory of the working directory.
-    Images are located in the 'images' subdirectory.
-    epochs - maximum training limit
-    checkpoint - save model after this many epochs
-    base_model - specify model to continue training from
-    """
     setup_logging(working_dir)
     log_print("training started ...")
-
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log_print(f"using {device}")
-    
+
     # Setup directories
-    model_dir = os.path.join(working_dir, 'model')
+    models_dir = os.path.join(working_dir, 'models')
+    os.makedirs(models_dir, exist_ok=True)
+
     image_dir = os.path.join(working_dir, '256p')
     labels_file = os.path.join(working_dir, 'labels.json')
-    os.makedirs(model_dir, exist_ok=True)
 
-    # Initialize model
-    model = get_model_by_name(device=device, directory=model_dir, name=base_model)
-
-    feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224')
-
-    # Define dataset and dataloader
+    # Define transforms
     transform = transforms.Compose([
-        transforms.Resize((224, 224)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=feature_extractor.image_mean, std=feature_extractor.image_std)
     ])
 
+    # Create dataset and dataloader
     dataset = ImageDataset(image_dir, labels_file, transform=transform)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
 
-    # Define loss function and optimizer
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001) # type: ignore
+    # Initialize the model, optimizer, and loss function
+    model = CropNet().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    # Training loop
     for epoch in range(epochs):
         model.train()
-        epoch_loss = 0
+        running_loss = 0.0
 
-        for images, labels in tqdm(dataloader):
-
-            images, labels = images.to(device), labels.to(device)
-            
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+        for images, bboxes in dataloader:
+            images = images.to(device)
+            bboxes = bboxes.to(device)
 
             optimizer.zero_grad()
+            outputs = model(images)
+            loss = bbox_loss(outputs, bboxes)
             loss.backward()
             optimizer.step()
 
-            epoch_loss += loss.item()
+            running_loss += loss.item()
 
-        log_print(f" * epoch: {epoch+1}, loss: {epoch_loss/len(dataloader):.4f}")
+        avg_loss = running_loss / len(dataloader)
+        log_print(f"epoch [{epoch + 1}/{epochs}], loss: {avg_loss:.4f}")
 
-        # Save checkpoint
         if (epoch + 1) % checkpoint == 0:
             checkpoint_name = generate_model_name(base_model, len(dataset), epoch + 1)
-            checkpoint_path = os.path.join(model_dir, f"{checkpoint_name}.pth")
+            checkpoint_path = os.path.join(models_dir, f"{checkpoint_name}.pth")
             torch.save(model.state_dict(), checkpoint_path)
             log_print(f"checkpoint saved: {checkpoint_path}")
 

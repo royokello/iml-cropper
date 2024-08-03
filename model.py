@@ -1,25 +1,24 @@
-from transformers import ViTModel, ViTFeatureExtractor
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-class CropPredictor(nn.Module):
+class CropNet(nn.Module):
     def __init__(self):
-        super(CropPredictor, self).__init__()
-        # Load a pretrained Vision Transformer
-        self.feature_extractor = ViTFeatureExtractor.from_pretrained('google/vit-base-patch16-224')
-        self.vit = ViTModel.from_pretrained('google/vit-base-patch16-224')
-        
-        # Add our own regressor layers
-        self.regressor = nn.Sequential(
-            nn.Linear(self.vit.config.hidden_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, 4)
-        )
+        super(CropNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(64 * 32 * 32, 256)
+        self.fc2 = nn.Linear(256, 4)  # Predict 4 values: x_min, y_min, x_max, y_max
 
     def forward(self, x):
-        # Extract features with ViT
-        # x = self.feature_extractor(x, return_tensors="pt")['pixel_values']
-        x = self.vit(x).last_hidden_state[:, 0, :]
-        x = self.regressor(x)
-        x = torch.sigmoid(x)
+        x = F.relu(self.conv1(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv2(x))
+        x = F.max_pool2d(x, 2)
+        x = F.relu(self.conv3(x))
+        x = F.max_pool2d(x, 2)
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
         return x

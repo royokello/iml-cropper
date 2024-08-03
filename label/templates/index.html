@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ML Cropper GUI</title>
+    <title>IML Cropper GUI</title>
     <style>
         body {
             display: flex;
@@ -38,19 +38,11 @@
     </style>
 </head>
 <body>
-    <h1>ML Cropper GUI</h1>
-    <!-- <div id="image-info">
-        <span id="current-index">1</span> / <span id="total-images">{{ total_images }}</span>
-    </div> -->
+    <h1>IML Cropper GUI</h1>
 
     <div>
         <p>Current Index: <span id="current-index">1</span> / {{ total_images }}</p>
-        <p>Total Labeled: <span id="total-labels">{{ total_labels }}</span></p>
-
-        <label><input type="radio" name="step" value="false" onclick="updateStep(false)"> NEG(-)</label>
-        <label><input type="radio" name="step" value="true" checked onclick="updateStep(true)"> POS(+)</label>
-
-        <button onclick="nextLabeledImage()">Next Labeled Image</button>
+        <p>Total Labeled: <span id="total-labels">{{ total_labels }}</span></p>  
     </div>
 
     <div class="controls">
@@ -58,6 +50,10 @@
         <button onclick="prevImage()">Previous</button>
         <button onclick="nextImage()">Next</button>
         <button onclick="getRandomImage()">Random</button>
+        <label><input type="radio" name="step" value="false" onclick="updateStep(false)"> NEG(-)</label>
+        <label><input type="radio" name="step" value="true" checked onclick="updateStep(true)"> POS(+)</label>
+        <button onclick="nextLabeledImage()">Next Labeled Image</button>
+    </div>
 
 
     <div class="controls">
@@ -150,6 +146,7 @@
 
         window.onload = function() {
             fetchImageByIndex(current_index);
+            drawCropSquare(0,0,100,100)
         };
 
         function fetchImageByIndex(index) {
@@ -202,16 +199,10 @@
                     console.log(data)
                     let prediction = data.prediction;
 
-                    let image_width = document.getElementById('image').width;
-                    let image_height = document.getElementById('image').height;
-
-                    let x_padding = (256 - image_width) / 2;
-                    let y_padding = (256 - image_height) / 2;
-
-                    crop_data.x1 = prediction[0] * image_width + x_padding;
-                    crop_data.x2 = prediction[1] * image_width + x_padding;
-                    crop_data.y1 = prediction[2] * image_height + y_padding;
-                    crop_data.y2 = prediction[3] * image_height + y_padding;
+                    crop_data.x1 = prediction[0] * 256;
+                    crop_data.y1 = prediction[1] * 256;
+                    crop_data.x2 = prediction[2] * 256;
+                    crop_data.y2 = prediction[3] * 256;
 
                     drawCropSquare(crop_data.x1, crop_data.y1, crop_data.x2, crop_data.y2);
                 })
@@ -221,29 +212,15 @@
         }
 
         function saveLabel() {
-
-            let image_width = document.getElementById('image').width;
-            let image_height = document.getElementById('image').height;
-
-            x_padding = (256 - image_width) / 2
-            y_padding = (256 - image_height) / 2
-
-            adj_coord = {
-                x1: crop_data.x1 - x_padding,
-                y1: crop_data.y1 - y_padding,
-                x2: crop_data.x2 - x_padding,
-                y2: crop_data.y2 - y_padding
-            }
-
             fetch('/label', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     'id': current_index,
-                    'x1': adj_coord.x1 / image_width,
-                    'y1': adj_coord.y1 / image_height,
-                    'x2': adj_coord.x2 / image_width,
-                    'y2': adj_coord.y2 / image_height
+                    'x1': crop_data.x1 / 256,
+                    'y1': crop_data.y1 / 256,
+                    'x2': crop_data.x2 / 256,
+                    'y2': crop_data.y2 / 256
                 })
             }).then(response => response.json())
             .then(data => {

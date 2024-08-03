@@ -6,7 +6,7 @@ import os
 import torch
 
 from predict import predict
-from utils import get_labels, get_model_by_latest, get_model_by_name, save_labels
+from lib import get_labels, get_model_by_latest, get_model_by_name, save_labels
 
 app = Flask(__name__)
 working_dir = ""
@@ -54,7 +54,6 @@ def get_image(img_id):
 @app.route('/next_labeled_image', methods=['POST'])
 def next_labeled_image():
     global labels
-    print("next_labeled_image ...")
     data = request.json
     if data:
         next_img_id = get_next_img_id(img_id=int(data["id"]), positive_step=data["step"], labels=labels)
@@ -76,21 +75,21 @@ def label_image():
 @app.route('/predict_crop/<int:img_id>')
 def predict_crop(img_id):
     global image_dir, model, device
-    model = get_model_by_name(device=device, )
     img_path = os.path.join(image_dir, f"{img_id}.png")
     prediction = predict(device=device, model=model, image_path=img_path)
-    print(" * prediction: {prediction}")
-    return jsonify(prediction=prediction)
+    print(f" * prediction: {prediction}")
+    formatted_prediction = [float(p) for p in prediction]
+    return jsonify(prediction=formatted_prediction)
 
 
 def label(working_directory: str):
     global working_dir, image_files, current_index, image_dir, model, labels, device
     working_dir = working_directory
     image_dir = os.path.join(working_dir, '256p')
-    image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png'))]
     current_index = 0
     labels = get_labels(directory=working_dir)
-    model_dir = os.path.join(working_dir, 'model')
+    model_dir = os.path.join(working_dir, 'models')
     model = get_model_by_latest(device=device, directory=model_dir)
     app.run(debug=True)
 

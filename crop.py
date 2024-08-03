@@ -4,7 +4,7 @@ from PIL import Image
 import numpy as np
 import torch
 
-from utils import load_model
+from lib import load_model
 
 def image_to_tensor(image: Image.Image, device: torch.device) -> torch.Tensor:
     """

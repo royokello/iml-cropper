@@ -4,7 +4,7 @@ import os
 import time
 import torch
 
-from model import CropPredictor
+from model import CropNet
 
 def setup_logging(working_dir):
     log_file_path = os.path.join(working_dir, 'training.log')
@@ -28,29 +28,31 @@ def generate_model_name(base_model: str | None, samples: int, epochs: int) -> st
     
     return result
 
-def get_model_by_name(device: torch.device, directory: str|None=None, name: str|None=None) -> CropPredictor:
+def get_model_by_name(device: torch.device, directory: str, name: str) -> torch.nn.Module:
     """
-    Load a model whose filename starts with the given name from the specified directory and move it to the specified device.
-    """
-    result = CropPredictor().to(device)
-
-    if directory and name:
-        for file in os.listdir(directory):
-            if file.startswith(name):
-                model_path = os.path.join(directory, file)
-                break
-        else:
-            raise ValueError(f"No model starting with {name} found in {directory}")
-
-        result.load_state_dict(torch.load(model_path))
     
-    return result
+    """
+    
+    model = CropNet()  # Initialize your model architecture
 
-def get_model_by_latest(device: torch.device, directory: str|None=None) -> CropPredictor:
+    for file in os.listdir(directory):
+        if file.startswith(name):
+            model_path = os.path.join(directory, file)
+            break
+    else:
+        raise ValueError(f"No model starting with {name} found in {directory}")
+
+    model.load_state_dict(torch.load(model_path, map_location=device))
+
+    model = model.to(device)
+    
+    return model
+
+def get_model_by_latest(device: torch.device, directory: str|None=None) -> torch.nn.Module:
     """
     Load a model whose model name is the latest time from the specified directory and move it to the specified device.
     """
-    result = CropPredictor().to(device)
+    model = CropNet()
 
     if directory and os.path.exists(directory):
         model_files = [f for f in os.listdir(directory) if f.endswith('.pth')]
@@ -62,9 +64,11 @@ def get_model_by_latest(device: torch.device, directory: str|None=None) -> CropP
         
         model_path = os.path.join(directory, latest_model)
 
-        result.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, map_location=device))
+
+    model = model.to(device)
     
-    return result
+    return model
 
 def get_labels(directory: str) -> dict[int, list[int]]:
     """
