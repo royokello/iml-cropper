@@ -12,9 +12,9 @@ pip install -r requirements.txt
 
 ## Data
 
-for training a 256p input images and label.json are required.
+for training 256p input images and label.json are required.
 
-for cropping 256p and 1024p input images are required.
+for cropping a trained model, 256p and 1024p input images are required.
 
 ```
 working_dir
@@ -38,6 +38,8 @@ working_dir
 
 ## Train
 
-`python train.py -w "path to working directory" -e "epochs" -c "checkpoints" -b "base model name`
+`python train.py -w "path to working directory" -e "epochs" -c "checkpoints" -b "base model name (optional)"`
 
 ## Crop
+
+`python crop.py -w "path to working directory"`
