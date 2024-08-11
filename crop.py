@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 from PIL import Image
 import numpy as np
 import torch
@@ -8,10 +9,10 @@ from utils import get_model_by_latest, get_model_by_name
 from predict import predict
 
 
-def crop(working_dir: str, model_name: str|None=None):
+def main(working_dir: str, model_name: str|None=None):
     """
     """
-    models_dir = os.path.join(working_dir, 'models')
+    models_dir = os.path.join(working_dir, 'cropper', 'models')
     
     # Load the trained model
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -21,10 +22,16 @@ def crop(working_dir: str, model_name: str|None=None):
     else:
         model = get_model_by_latest(device=device, directory=models_dir)
 
-    low_input_dir = os.path.join(working_dir, 'input', '256p')
+    model.eval()
 
-    low_output_dir = os.path.join(working_dir, 'output', '256p')
-    std_output_dir = os.path.join(working_dir, 'output', '512p')
+    low_input_dir = os.path.join(working_dir, 'cropper', 'input', '256p')
+
+    low_output_dir = os.path.join(working_dir, 'cropper', 'output', '256p')
+    std_output_dir = os.path.join(working_dir, 'cropper', 'output', '512p')
+    if os.path.exists(low_output_dir):
+        shutil.rmtree(low_output_dir)
+    if os.path.exists(std_output_dir):
+        shutil.rmtree(std_output_dir)
     os.makedirs(low_output_dir, exist_ok=True)
     os.makedirs(std_output_dir, exist_ok=True)
 
@@ -34,7 +41,7 @@ def crop(working_dir: str, model_name: str|None=None):
         
         prediction = predict(device=device, model=model, image_path=low_input_path)
 
-        high_input_path = os.path.join(working_dir, 'input', '1024p', img_name)
+        high_input_path = os.path.join(working_dir, 'cropper', 'input', '1024p', img_name)
 
         # Open the image
         high_input_image = Image.open(high_input_path)
@@ -63,4 +70,4 @@ if __name__ == "__main__":
     parser.add_argument("-w", "--working_dir", type=str, required=True, help="Directory where the images to be cropped are located.")
     
     args = parser.parse_args()
-    crop(args.working_dir)
+    main(args.working_dir)

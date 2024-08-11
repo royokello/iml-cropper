@@ -7,9 +7,6 @@ def predict(device: torch.device, model, image_path: str) -> tuple[float, float,
     """
     Predicts the coordinates of the bounding box for an object in the given image using the trained model.
     """
-    # Ensure the model is in evaluation mode
-    model.eval()
-    
     # Define the transformation
     transform = transforms.Compose([
         transforms.ToTensor(),

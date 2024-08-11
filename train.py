@@ -7,15 +7,13 @@ from torch.utils.data import Dataset, DataLoader
 from dataset import ImageDataset
 from utils import generate_model_name, get_model_by_name, log_print, setup_logging
 import torch.nn.functional as F
-
-from model import CropNet
-
-import torch.nn.functional as F
+from model import CropperNet
+import torch.nn as nn
 
 def bbox_loss(pred, target):
     return F.smooth_l1_loss(pred, target)
 
-def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
+def main(working_dir: str, num_epochs: int, checkpoint: int, base_model: str|None):
     setup_logging(working_dir)
     log_print("training started ...")
     
@@ -23,11 +21,11 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     log_print(f"using {device}")
 
     # Setup directories
-    models_dir = os.path.join(working_dir, 'models')
+    models_dir = os.path.join(working_dir, 'cropper', 'models')
     os.makedirs(models_dir, exist_ok=True)
 
-    image_dir = os.path.join(working_dir, 'input', '256p')
-    labels_file = os.path.join(working_dir, 'labels.json')
+    low_res_dir = os.path.join(working_dir, 'cropper', 'input', '256p')
+    labels_file = os.path.join(working_dir, 'cropper', 'labels.json')
 
     # Define transforms
     transform = transforms.Compose([
@@ -35,35 +33,35 @@ def train(working_dir: str, epochs: int, checkpoint: int, base_model: str|None):
     ])
 
     # Create dataset and dataloader
-    dataset = ImageDataset(image_dir, labels_file, transform=transform)
+    dataset = ImageDataset(low_res_dir, labels_file, transform=transform)
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
 
     # Initialize the model, optimizer, and loss function
     if base_model:
         model = get_model_by_name(device=device, directory=models_dir, name=base_model)
     else:
-        model = CropNet().to(device)
+        model = CropperNet().to(device)
+
+    model.train()
         
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4) # type: ignore
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001) # type: ignore
 
-    for epoch in range(epochs):
-        model.train()
+    for epoch in range(num_epochs):
         running_loss = 0.0
-
-        for images, bboxes in dataloader:
+        for images, bbox in dataloader:
             images = images.to(device)
-            bboxes = bboxes.to(device)
-
+            bbox = bbox.to(device)
             optimizer.zero_grad()
             outputs = model(images)
-            loss = bbox_loss(outputs, bboxes)
+            loss = criterion(outputs, bbox)
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
 
         avg_loss = running_loss / len(dataloader)
-        log_print(f"epoch [{epoch + 1}/{epochs}], loss: {avg_loss:.4f}")
+        log_print(f"epoch [{epoch + 1}/{num_epochs}], loss: {avg_loss:.4f}")
 
         if (epoch + 1) % checkpoint == 0:
             checkpoint_name = generate_model_name(base_model, len(dataset), epoch + 1)
@@ -81,9 +79,9 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    train(
+    main(
         working_dir=args.working_dir,
-        epochs=args.epochs,
+        num_epochs=args.epochs,
         checkpoint=args.checkpoint,
         base_model=args.base_model
     )

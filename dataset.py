@@ -6,8 +6,8 @@ from PIL import Image
 
 
 class ImageDataset(Dataset):
-    def __init__(self, root_dir, labels_file, transform=None):
-        self.root_dir = root_dir
+    def __init__(self, low_res_dir, labels_file, transform=None):
+        self.low_res_dir = low_res_dir
         self.transform = transform
         with open(labels_file, 'r') as f:
             self.labels = json.load(f)
@@ -18,15 +18,16 @@ class ImageDataset(Dataset):
 
     def __getitem__(self, idx):
         img_name = self.image_names[idx]
-        img_path = os.path.join(self.root_dir, f"{img_name}.png")
+        img_path = os.path.join(self.low_res_dir, f"{img_name}.png")
         image = Image.open(img_path).convert("RGB")
-        
-        bbox = self.labels[img_name]
-        x_min, y_min, x_max, y_max = bbox
-        bbox = torch.tensor([x_min, y_min, x_max, y_max], dtype=torch.float32)
-        
+
         if self.transform:
             image = self.transform(image)
         
+        bbox = self.labels[img_name]
+        x1, y1, x2, y2 = bbox
+        bbox = torch.tensor([x1, y1, x2, y2], dtype=torch.float32)
+
         return image, bbox
+
     
