@@ -18,17 +18,18 @@ for cropping a trained model, 256p and 1024p input images are required.
 
 ```
 working_dir
-├── input
-│   ├── 256p
-│   └── 1024p
-├── models
-│   ├── 1722688867_s=16_e=16.pth
-│   └── 1722691040_b=1722688867_s=31_e=8.pth
-├── output
-│   ├── 256p
-│   └── 512p
-├── labels.json
-└── training.txt
+└── cropper
+    ├── input
+    │   ├── 256p
+    │   └── 1024p
+    ├── models
+    │   ├── 1722688867_s=16_e=16.pth
+    │   └── 1722691040_b=1722688867_s=31_e=8.pth
+    ├── output
+    │   ├── 256p
+    │   └── 512p
+    ├── labels.json
+    └── training.txt
 
 ```
 

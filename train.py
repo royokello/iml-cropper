@@ -14,18 +14,19 @@ def bbox_loss(pred, target):
     return F.smooth_l1_loss(pred, target)
 
 def main(working_dir: str, num_epochs: int, checkpoint: int, base_model: str|None):
-    setup_logging(working_dir)
+    cropper_dir = os.path.join(working_dir, 'cropper')
+    setup_logging(cropper_dir)
     log_print("training started ...")
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     log_print(f"using {device}")
 
     # Setup directories
-    models_dir = os.path.join(working_dir, 'cropper', 'models')
+    models_dir = os.path.join(cropper_dir, 'models')
     os.makedirs(models_dir, exist_ok=True)
 
-    low_res_dir = os.path.join(working_dir, 'cropper', 'input', '256p')
-    labels_file = os.path.join(working_dir, 'cropper', 'labels.json')
+    low_res_dir = os.path.join(cropper_dir, 'input', '256p')
+    labels_file = os.path.join(cropper_dir, 'labels.json')
 
     # Define transforms
     transform = transforms.Compose([
@@ -34,6 +35,7 @@ def main(working_dir: str, num_epochs: int, checkpoint: int, base_model: str|Non
 
     # Create dataset and dataloader
     dataset = ImageDataset(low_res_dir, labels_file, transform=transform)
+    print(f" * loaded {len(dataset)} images")
     dataloader = DataLoader(dataset, batch_size=16, shuffle=True, num_workers=4)
 
     # Initialize the model, optimizer, and loss function

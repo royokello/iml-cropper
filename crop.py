@@ -41,14 +41,14 @@ def main(working_dir: str, model_name: str|None=None):
         
         prediction = predict(device=device, model=model, image_path=low_input_path)
 
-        high_input_path = os.path.join(working_dir, 'cropper', 'input', '1024p', img_name)
+        high_res_img_path = os.path.join(working_dir, 'cropper', 'input', '1024p', img_name)
 
         # Open the image
-        high_input_image = Image.open(high_input_path)
+        high_res_img = Image.open(high_res_img_path)
 
         # Apply the predicted crop
         x1, y1, x2, y2 = [int(p * 1024) for p in prediction]
-        cropped_image = high_input_image.crop((x1, y1, x2, y2))
+        cropped_image = high_res_img.crop((x1, y1, x2, y2))
 
         resolutions = [
             (256, low_output_dir),
