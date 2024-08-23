@@ -39,7 +39,7 @@ working_dir
 
 ## Train
 
-`python train.py -w "path to working directory" -e "epochs" -c "checkpoints" -b "base model name (optional)"`
+`python train.py -d "path to working directory" -e "epochs" -c "checkpoint" -b "base"`
 
 ## Crop
 

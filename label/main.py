@@ -10,8 +10,10 @@ from utils import get_labels, get_model_by_latest, get_model_by_name, save_label
 
 app = Flask(__name__)
 working_dir = ""
-image_dir = ""
+low_res_image_dir = ""
+high_res_image_dir = ""
 image_files = []
+model_dir = ""
 model = None
 labels: dict[int, list[int]] = {}
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,15 +43,17 @@ def get_next_img_id(img_id: int, positive_step: bool, labels: dict[int, list[int
 
 @app.route('/')
 def index():
-    global current_index, image_files, labels
+    global current_index, image_files, labels, model_dir
     total_images = len(image_files)
     total_labels = len(labels)
-    return render_template('index.html', total_images=total_images, total_labels=total_labels)
+    models = [f for f in os.listdir(model_dir) if os.path.isfile(os.path.join(model_dir, f))]
+    print(f"models={models}")
+    return render_template('index.html', total_images=total_images, total_labels=total_labels, models=models)
 
 @app.route('/image/<int:img_id>')
 def get_image(img_id):
-    global image_dir
-    return send_from_directory(image_dir, f"{img_id}.png")
+    global high_res_image_dir
+    return send_from_directory(high_res_image_dir, f"{img_id}.png")
 
 @app.route('/next_labeled_image', methods=['POST'])
 def next_labeled_image():
@@ -74,19 +78,30 @@ def label_image():
 
 @app.route('/predict_crop/<int:img_id>')
 def predict_crop(img_id):
-    global image_dir, model, device
-    img_path = os.path.join(image_dir, f"{img_id}.png")
+    global low_res_image_dir, model, device
+    img_path = os.path.join(low_res_image_dir, f"{img_id}.png")
     prediction = predict(device=device, model=model, image_path=img_path)
     print(f" * prediction: {prediction}")
     formatted_prediction = [float(p) for p in prediction]
     return jsonify(prediction=formatted_prediction)
 
+@app.route('/load_model/<string:model_name>')
+def load_model(model_name):
+    global device, model, model_dir
+    try:
+        model = get_model_by_name(device=device, name=model_name, directory=model_dir)
+        model.eval()
+        return jsonify({"status": "success", "message": f"Model '{model_name}' loaded successfully."})
+    
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 def label(working_directory: str):
-    global working_dir, image_files, current_index, image_dir, model, labels, device
+    global working_dir, image_files, current_index, low_res_image_dir, model, labels, device, high_res_image_dir, model_dir
     working_dir = working_directory
-    image_dir = os.path.join(working_dir, 'cropper', 'input', '256p')
-    image_files = [f for f in os.listdir(image_dir) if f.lower().endswith(('.png'))]
+    low_res_image_dir = os.path.join(working_dir, 'cropper', 'input', '256p')
+    high_res_image_dir = os.path.join(working_dir, 'cropper', 'input', '1024p')
+    image_files = [f for f in os.listdir(low_res_image_dir) if f.lower().endswith(('.png'))]
     current_index = 0
     labels = get_labels(directory=working_dir)
     model_dir = os.path.join(working_dir, 'cropper', 'models')

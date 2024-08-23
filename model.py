@@ -17,20 +17,25 @@ class CropperNet(nn.Module):
         
         # Backbone for feature extraction
         self.backbone = nn.Sequential(
-            ConvBlock(3, 32, kernel_size=3, stride=2, padding=1),
-            ConvBlock(32, 64, kernel_size=3, stride=2, padding=1),
+            ConvBlock(3, 64, kernel_size=3, stride=2, padding=1),
             ConvBlock(64, 128, kernel_size=3, stride=2, padding=1),
             ConvBlock(128, 256, kernel_size=3, stride=2, padding=1),
             ConvBlock(256, 512, kernel_size=3, stride=2, padding=1),
+            ConvBlock(512, 1024, kernel_size=3, stride=2, padding=1),
         )
+
         
         # Head for bounding box regression
         self.bbox_head = nn.Sequential(
+            nn.Conv2d(1024, 512, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
             nn.Conv2d(512, 256, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
             nn.Conv2d(256, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv2d(128, 4, kernel_size=1, stride=1, padding=0)  # 4 outputs: x1, y1, x2, y2 for bbox
+            nn.Conv2d(128, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 4, kernel_size=1, stride=1, padding=0)
         )
 
         self.sigmoid = nn.Sigmoid()
